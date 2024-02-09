@@ -10,9 +10,7 @@ use std::marker::PhantomData;
 use std::ptr;
 use std::sync::{Arc, Mutex};
 
-use js::jsapi::{
-    Heap, JSObject, JS_GetArrayBufferViewBuffer, NewExternalArrayBuffer,
-};
+use js::jsapi::{Heap, JSObject, JS_GetArrayBufferViewBuffer, NewExternalArrayBuffer};
 use js::rust::wrappers::DetachArrayBuffer;
 use js::rust::{CustomAutoRooterGuard, MutableHandleObject};
 use js::typedarray::{CreateWith, TypedArray, TypedArrayElement, TypedArrayElementCreator};
