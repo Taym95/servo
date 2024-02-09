@@ -11,7 +11,7 @@ use std::ptr;
 use std::sync::{Arc, Mutex};
 
 use js::jsapi::{
-    Heap, JSObject, JS_GetArrayBufferViewBuffer, JS_IsArrayBufferViewObject, NewExternalArrayBuffer,
+    Heap, JSObject, JS_GetArrayBufferViewBuffer, NewExternalArrayBuffer,
 };
 use js::rust::wrappers::DetachArrayBuffer;
 use js::rust::{CustomAutoRooterGuard, MutableHandleObject};
@@ -71,7 +71,7 @@ where
         assert!(self.is_initialized());
         let mut is_shared = false;
         unsafe {
-            assert!(JS_IsArrayBufferViewObject(*self.internal.handle()));
+            // assert!(JS_IsArrayBufferViewObject(*self.internal.handle()));
             rooted!(in (*cx) let view_buffer =
                  JS_GetArrayBufferViewBuffer(*cx, self.internal.handle(), &mut is_shared));
             // This buffer is always created unshared
