@@ -265,24 +265,25 @@ impl HTMLIFrameElement {
                 load_data,
                 HistoryEntryReplacement::Disabled,
             );
+
+            // https://html.spec.whatwg.org/multipage/#attr-iframe-name
+            // Note: the spec says to set the name 'when the nested browsing context is created'.
+            // The current implementation sets the name on the window,
+            // when the iframe attributes are first processed.
+            if mode == ProcessingMode::FirstTime {
+                if let Some(window) = self.GetContentWindow() {
+                    window.set_name(
+                        self.upcast::<Element>()
+                            .get_name()
+                            .map_or(DOMString::from(""), |n| DOMString::from(&*n)),
+                    );
+                }
+            }
+
             return;
         }
 
         let window = window_from_node(self);
-
-        // https://html.spec.whatwg.org/multipage/#attr-iframe-name
-        // Note: the spec says to set the name 'when the nested browsing context is created'.
-        // The current implementation sets the name on the window,
-        // when the iframe attributes are first processed.
-        if mode == ProcessingMode::FirstTime {
-            if let Some(window) = self.GetContentWindow() {
-                window.set_name(
-                    self.upcast::<Element>()
-                        .get_name()
-                        .map_or(DOMString::from(""), |n| DOMString::from(&*n)),
-                );
-            }
-        }
 
         if mode == ProcessingMode::FirstTime &&
             !self.upcast::<Element>().has_attribute(&local_name!("src"))
