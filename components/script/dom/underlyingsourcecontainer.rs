@@ -128,10 +128,15 @@ impl UnderlyingSourceContainer {
                 rooted!(in(*cx) let mut this_object = ptr::null_mut::<JSObject>());
                 unsafe {
                     this_object.set(JS_NewObject(*cx, ptr::null_mut()));
-                    error!("before to_jsobject: this_object.is_null(): {:?}", this_object.is_null());
+                    error!(
+                        "before to_jsobject: this_object.is_null(): {:?}",
+                        this_object.is_null()
+                    );
                     source.to_jsobject(*cx, this_object.handle_mut());
-                    error!("afeter to_jsobject: this_object.is_null(): {:?}", this_object.is_null());
-
+                    error!(
+                        "afeter to_jsobject: this_object.is_null(): {:?}",
+                        this_object.is_null()
+                    );
                 }
                 let this_handle = this_object.handle();
                 rooted!(in(*cx) let mut result_object = ptr::null_mut::<JSObject>());
