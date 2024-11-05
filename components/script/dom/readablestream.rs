@@ -2,6 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+use std::backtrace::Backtrace;
 use std::cell::Cell;
 use std::ptr::{self, NonNull};
 use std::rc::Rc;
@@ -45,7 +46,7 @@ use crate::realms::InRealm;
 use crate::script_runtime::{CanGc, JSContext as SafeJSContext};
 
 /// <https://streams.spec.whatwg.org/#readablestream-state>
-#[derive(Clone, Copy, Default, JSTraceable, MallocSizeOf, PartialEq)]
+#[derive(Clone, Copy, Default, JSTraceable, MallocSizeOf, PartialEq, Debug)]
 pub enum ReadableStreamState {
     #[default]
     Readable,
@@ -95,6 +96,8 @@ pub struct ReadableStream {
 
     /// <https://streams.spec.whatwg.org/#readablestream-state>
     state: Cell<ReadableStreamState>,
+
+    has_reader: Cell<bool>,
 }
 
 impl ReadableStream {
@@ -123,6 +126,7 @@ impl ReadableStream {
             disturbed: Default::default(),
             reader,
             state: Cell::new(ReadableStreamState::Readable),
+            has_reader: Default::default(),
         }
     }
 
@@ -302,24 +306,38 @@ impl ReadableStream {
         }
     }
 
+    /// Acquires a reader and locks the stream,
+    /// must be done before `read_a_chunk`.
+    /// Native call to
     /// <https://streams.spec.whatwg.org/#acquire-readable-stream-reader>
-    pub fn start_reading(&self) -> Result<DomRoot<ReadableStreamDefaultReader>, ()> {
+    pub fn start_reading(&self) -> Result<(), ()> {
         // Let reader be a new ReadableStreamDefaultReader.
         // Perform ? SetUpReadableStreamDefaultReader(reader, stream).
+        // Return reader.
         let reader = ReadableStreamDefaultReader::set_up(&self.global(), self, CanGc::note())
             .map_err(|_| ())?;
 
         self.set_reader(Some(&reader));
 
-        // Return reader.
-        Ok(reader)
+        self.has_reader.set(true);
+
+        Ok(())
     }
 
+    // fn traced_function(&self) {
+    //     let backtrace = Backtrace::capture();
+    //     println!("Backtrace of function call:\n{:?}", backtrace);
+    // }
+
+    /// Read a chunk from the stream,
+    /// must be called after `start_reading`,
+    /// and before `stop_reading`.
     /// Native call to
     /// <https://streams.spec.whatwg.org/#readable-stream-default-reader-read>
     pub fn read_a_chunk(&self, can_gc: CanGc) -> Rc<Promise> {
         match self.reader {
             ReaderType::Default(ref reader) => {
+                error!("called read_a_chunk");
                 let Some(reader) = reader.get() else {
                     panic!("Attempt to read stream chunk without having first acquired a reader.");
                 };
@@ -329,9 +347,15 @@ impl ReadableStream {
         }
     }
 
+    /// Releases the lock on the reader,
+    /// must be done after `start_reading`.
     /// Native call to
     /// <https://streams.spec.whatwg.org/#abstract-opdef-readablestreamdefaultreaderrelease>
     pub fn stop_reading(&self) {
+        if !self.has_reader.get() {
+            panic!("ReadableStream::stop_reading called on a readerless stream.");
+        }
+        self.has_reader.set(false);
         match self.reader {
             ReaderType::Default(ref reader) => {
                 let Some(reader) = reader.get() else {
@@ -345,6 +369,9 @@ impl ReadableStream {
 
     /// <https://streams.spec.whatwg.org/#is-readable-stream-locked>
     pub fn is_locked(&self) -> bool {
+        if self.has_reader.get() {
+            return true;
+        }
         match self.reader {
             ReaderType::Default(ref reader) => reader.get().is_some(),
             ReaderType::BYOB(ref reader) => reader.get().is_some(),
@@ -429,6 +456,7 @@ impl ReadableStream {
     /// <https://streams.spec.whatwg.org/#readable-stream-close>
     pub fn close(&self) {
         // step 1
+        error!("called close, stream state: {:?}", self.state.get());
         assert!(self.is_readable());
         // step 2
         self.state.set(ReadableStreamState::Closed);

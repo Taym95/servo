@@ -56,6 +56,15 @@ pub enum BodySource {
     Object,
 }
 
+impl BodySource {
+    pub fn to_string(&self) -> String {
+        match self {
+            BodySource::Null => String::from("Null"),
+            BodySource::Object => String::from("Object"),
+        }
+    }
+}
+
 /// The reason to stop reading from the body.
 enum StopReading {
     /// The stream has errored.
@@ -176,6 +185,8 @@ impl TransmitBodyConnectHandler {
     fn start_reading(&mut self, sender: IpcSender<BodyChunkResponse>) {
         self.bytes_sender = Some(sender);
 
+        error!("calling start_reading {:?} ", self.source.to_string());
+
         // If we're using an actual ReadableStream, acquire a reader for it.
         if self.source == BodySource::Null {
             let stream = self.stream.clone();
@@ -187,8 +198,10 @@ impl TransmitBodyConnectHandler {
                     // TODO: Step 2, If body is null.
 
                     // Step 3, get a reader for stream.
-                    rooted_stream.start_reading().expect("Couldn't acquire a reader for the body stream.");
 
+                    error!("rooted_stream.start_reading  from TransmitBodyConnectHandler");
+                    rooted_stream.start_reading().expect("Couldn't acquire a reader for the body stream.");
+                    error!("rooted_stream.start_reading  from TransmitBodyConnectHandler done");
                     // Note: this algorithm continues when the first chunk is requested by `net`.
                 }),
                 &self.canceller,
@@ -388,6 +401,8 @@ impl ExtractedBody {
             _ => NetBodySource::Object,
         };
 
+        error!("into_net_request_body::source {:?} ", source.to_string());
+
         let mut body_handler = TransmitBodyConnectHandler::new(
             trusted_stream,
             task_source,
@@ -402,12 +417,16 @@ impl ExtractedBody {
             Box::new(move |message| {
                 match message.unwrap() {
                     BodyChunkRequest::Connect(sender) => {
+                        error!("calling BodyChunkRequest::Connect on a TransmitBodyConnectHandler");
                         body_handler.start_reading(sender);
                     },
                     BodyChunkRequest::Extract(receiver) => {
                         body_handler.re_extract(receiver);
                     },
-                    BodyChunkRequest::Chunk => body_handler.transmit_body_chunk(),
+                    BodyChunkRequest::Chunk => {
+                        error!("calling BodyChunkRequest::Chunk on a TransmitBodyConnectHandler");
+                        body_handler.transmit_body_chunk()
+                    },
                     // Note: this is actually sent from this process
                     // by the TransmitBodyPromiseHandler when reading stops.
                     BodyChunkRequest::Done => {
@@ -450,6 +469,7 @@ impl Extractable for BodyInit {
             BodyInit::Blob(ref b) => b.extract(global, can_gc),
             BodyInit::FormData(ref formdata) => formdata.extract(global, can_gc),
             BodyInit::ArrayBuffer(ref typedarray) => {
+                error!("BodyInit::ArrayBuffer");
                 let bytes = typedarray.to_vec();
                 let total_bytes = bytes.len();
                 let stream = ReadableStream::new_from_bytes(global, bytes, can_gc);
@@ -461,6 +481,7 @@ impl Extractable for BodyInit {
                 })
             },
             BodyInit::ArrayBufferView(ref typedarray) => {
+                error!("BodyInit::ArrayBufferView");
                 let bytes = typedarray.to_vec();
                 let total_bytes = bytes.len();
                 let stream = ReadableStream::new_from_bytes(global, bytes, can_gc);
@@ -472,6 +493,7 @@ impl Extractable for BodyInit {
                 })
             },
             BodyInit::ReadableStream(stream) => {
+                error!("BodyInit::ReadableStream");
                 // TODO:
                 // 1. If the keepalive flag is set, then throw a TypeError.
 
@@ -494,6 +516,7 @@ impl Extractable for BodyInit {
 
 impl Extractable for Vec<u8> {
     fn extract(&self, global: &GlobalScope, can_gc: CanGc) -> Fallible<ExtractedBody> {
+        error!("Vec<u8>::extract");
         let bytes = self.clone();
         let total_bytes = self.len();
         let stream = ReadableStream::new_from_bytes(global, bytes, can_gc);
@@ -509,6 +532,7 @@ impl Extractable for Vec<u8> {
 
 impl Extractable for Blob {
     fn extract(&self, _global: &GlobalScope, can_gc: CanGc) -> Fallible<ExtractedBody> {
+        error!("Blob::extract");
         let blob_type = self.Type();
         let content_type = if blob_type.as_ref().is_empty() {
             None
@@ -527,6 +551,7 @@ impl Extractable for Blob {
 
 impl Extractable for DOMString {
     fn extract(&self, global: &GlobalScope, can_gc: CanGc) -> Fallible<ExtractedBody> {
+        error!("DOMString::extract");
         let bytes = self.as_bytes().to_owned();
         let total_bytes = bytes.len();
         let content_type = Some(DOMString::from("text/plain;charset=UTF-8"));
@@ -542,6 +567,7 @@ impl Extractable for DOMString {
 
 impl Extractable for FormData {
     fn extract(&self, global: &GlobalScope, can_gc: CanGc) -> Fallible<ExtractedBody> {
+        error!("FormData::extract");
         let boundary = generate_boundary();
         let bytes = encode_multipart_form_data(&mut self.datums(), boundary.clone(), UTF_8);
         let total_bytes = bytes.len();
@@ -561,6 +587,7 @@ impl Extractable for FormData {
 
 impl Extractable for URLSearchParams {
     fn extract(&self, global: &GlobalScope, can_gc: CanGc) -> Fallible<ExtractedBody> {
+        error!("URLSearchParams::extract");
         let bytes = self.serialize_utf8().into_bytes();
         let total_bytes = bytes.len();
         let content_type = Some(DOMString::from(
