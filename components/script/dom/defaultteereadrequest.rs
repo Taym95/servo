@@ -32,8 +32,12 @@ pub struct DefaultTeeReadRequestMicrotask {
 }
 
 impl DefaultTeeReadRequestMicrotask {
+    #[allow(unsafe_code)]
     pub fn microtask_chunk_steps(&self, can_gc: CanGc) {
-        self.tee_read_request.chunk_steps(&self.chunk, can_gc)
+        self.tee_read_request.chunk_steps(
+            unsafe { SafeHandleValue::from_raw(self.chunk.handle()) },
+            can_gc,
+        )
     }
 }
 
@@ -114,12 +118,12 @@ impl DefaultTeeReadRequest {
     /// <https://streams.spec.whatwg.org/#ref-for-read-request-chunk-steps%E2%91%A2>
     #[allow(unsafe_code)]
     #[allow(clippy::borrowed_box)]
-    pub fn chunk_steps(&self, chunk: &Box<Heap<JSVal>>, can_gc: CanGc) {
+    pub fn chunk_steps(&self, chunk: SafeHandleValue, can_gc: CanGc) {
         // Set readAgain to false.
         self.read_again.set(false);
         // Let chunk1 and chunk2 be chunk.
-        let chunk1 = chunk;
-        let chunk2 = chunk;
+        let chunk1 = Heap::boxed(*chunk);
+        let chunk2 = Heap::boxed(*chunk);
         // If canceled_2 is false and cloneForBranch2 is true,
         if !self.canceled_2.get() && self.clone_for_branch_2.get() {
             let cx = GlobalScope::get_cx();

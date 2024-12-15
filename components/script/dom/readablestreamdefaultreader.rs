@@ -33,7 +33,6 @@ use crate::script_runtime::{CanGc, JSContext as SafeJSContext};
 
 /// <https://streams.spec.whatwg.org/#read-request>
 #[derive(JSTraceable)]
-#[crown::unrooted_must_root_lint::must_root]
 pub enum ReadRequest {
     /// <https://streams.spec.whatwg.org/#default-reader-read>
     Read(Rc<Promise>),
@@ -90,6 +89,7 @@ impl ReadRequest {
 /// The rejection handler for
 /// <https://streams.spec.whatwg.org/#readable-stream-tee>
 #[derive(Clone, JSTraceable, MallocSizeOf)]
+#[allow(crown::unrooted_must_root)]
 struct ClosedPromiseRejectionHandler {
     branch_1_controller: Dom<ReadableStreamDefaultController>,
     branch_2_controller: Dom<ReadableStreamDefaultController>,

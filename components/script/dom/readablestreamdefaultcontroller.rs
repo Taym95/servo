@@ -128,7 +128,6 @@ impl Callback for StartAlgorithmRejectionHandler {
 
 /// <https://streams.spec.whatwg.org/#value-with-size>
 #[derive(JSTraceable)]
-#[crown::unrooted_must_root_lint::must_root]
 pub struct ValueWithSize {
     value: Box<Heap<JSVal>>,
     size: f64,
@@ -136,7 +135,6 @@ pub struct ValueWithSize {
 
 /// <https://streams.spec.whatwg.org/#value-with-size>
 #[derive(JSTraceable)]
-#[crown::unrooted_must_root_lint::must_root]
 pub enum EnqueuedValue {
     /// A value enqueued from Rust.
     Native(Box<[u8]>),
@@ -193,7 +191,6 @@ fn is_non_negative_number(value: &EnqueuedValue) -> bool {
 
 /// <https://streams.spec.whatwg.org/#queue-with-sizes>
 #[derive(Default, JSTraceable, MallocSizeOf)]
-#[crown::unrooted_must_root_lint::must_root]
 pub struct QueueWithSizes {
     #[ignore_malloc_size_of = "EnqueuedValue::Js"]
     queue: VecDeque<EnqueuedValue>,
