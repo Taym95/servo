@@ -220,18 +220,15 @@ impl MessagePort {
         rooted!(in(*cx) let mut message = unsafe { JS_NewObject(*cx, ptr::null()) });
         rooted!(in(*cx) let mut type_string = UndefinedValue());
         type_.safe_to_jsval(cx, type_string.handle_mut());
+        let cx = unsafe { SafeJSContext::from_ptr(*cx) };
 
         // Perform ! CreateDataProperty(message, "type", type).
-        unsafe {
-            set_dictionary_property(*cx, message.handle(), "type", type_string.handle())
-                .expect("Setting the message type should not fail.");
-        }
+        set_dictionary_property(cx, message.handle(), "type", type_string.handle())
+            .expect("Setting the message type should not fail.");
 
         // Perform ! CreateDataProperty(message, "value", value).
-        unsafe {
-            set_dictionary_property(*cx, message.handle(), "value", value)
-                .expect("Setting the message value should not fail.");
-        }
+        set_dictionary_property(cx, message.handle(), "value", value)
+            .expect("Setting the message value should not fail.");
 
         // Let targetPort be the port with which port is entangled, if any; otherwise let it be null.
         // Done in `global.post_messageport_msg`.
