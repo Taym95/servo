@@ -150,11 +150,8 @@ impl IDBTransaction {
 
     pub fn set_active_flag(&self, status: bool) {
         self.active.set(status);
-        // When the transaction becomes inactive and no requests are pending,
-        // it can transition to the finished state.
-        if !status && self.pending_request_count.get() == 0 && !self.finished.get() {
-            self.finished.set(true);
-            self.dispatch_complete();
+        if !status {
+            self.maybe_finish_successfully();
         }
     }
 
@@ -176,10 +173,7 @@ impl IDBTransaction {
 
     pub fn add_request(&self, request: &IDBRequest) {
         self.requests.borrow_mut().push(Dom::from_ref(request));
-        // Increase the number of outstanding requests so that we can detect when
-        // the transaction is allowed to finish.
-        self.pending_request_count
-            .set(self.pending_request_count.get() + 1);
+        self.inc_pending_requests();
     }
 
     /// Must be called by an `IDBRequest` when it finishes (either success or
@@ -187,16 +181,37 @@ impl IDBTransaction {
     /// is no longer active, the `"complete"` event is dispatched and any
     /// associated `IDBOpenDBRequest` `"success"` event is fired afterwards.
     pub fn request_finished(&self) {
-        if self.pending_request_count.get() == 0 {
+        self.dec_pending_requests();
+        self.maybe_finish_successfully();
+    }
+
+    fn inc_pending_requests(&self) {
+        // Track outstanding requests so we can detect when the transaction may finish.
+        self.pending_request_count
+            .set(self.pending_request_count.get() + 1);
+    }
+
+    fn dec_pending_requests(&self) {
+        let pending = self.pending_request_count.get();
+        if pending == 0 {
             return;
         }
-        let remaining = self.pending_request_count.get() - 1;
-        self.pending_request_count.set(remaining);
+        self.pending_request_count.set(pending - 1);
+    }
 
-        if remaining == 0 && !self.active.get() && !self.finished.get() {
-            self.finished.set(true);
-            self.dispatch_complete();
+    fn maybe_finish_successfully(&self) {
+        // Finish only after all requests complete and the transaction becomes inactive.
+        // https://w3c.github.io/IndexedDB/#transaction-lifecycle
+        if self.active.get()
+            || self.pending_request_count.get() != 0
+            || self.finished.get()
+            || self.error.get().is_some()
+        {
+            return;
         }
+
+        self.finished.set(true);
+        self.dispatch_complete();
     }
 
     fn dispatch_complete(&self) {
@@ -338,8 +353,8 @@ impl IDBTransactionMethods<crate::DomTypeHolder> for IDBTransaction {
         // Step 3
         // FIXME:(rasviitanen) https://www.w3.org/TR/IndexedDB-2/#commit-a-transaction
 
-        // Steps 3.1 and 3.3
-        self.dispatch_complete();
+        // commit() initiates committing; "complete" fires only after successful commit.
+        // https://w3c.github.io/IndexedDB/#transaction-lifecycle
 
         Ok(())
     }
